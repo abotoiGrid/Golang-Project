@@ -47,7 +47,7 @@ func UpdateLocation(c *gin.Context) {
 	_, err = locationHistoryClient.SaveLocation(context.Background(), &pb.LocationRequest{
 		Username:  request.Username,
 		Latitude:  request.Latitude,
-		Longitute: request.Longitude,
+		Longitude: request.Longitude,
 		Timestamp: time.Now().Unix(),
 	})
 	if err != nil {
