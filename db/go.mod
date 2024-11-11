@@ -1,4 +1,4 @@
-module github.com/abotoiGrid/Golang-Project/db
+module db
 
 go 1.23.2
 
