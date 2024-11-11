@@ -1,4 +1,4 @@
-module proto
+module github.com/abotoiGrid/Golang-Project/proto
 
 go 1.23.2
 
