@@ -19,8 +19,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	LocationService_UpdateLocation_FullMethodName          = "/location.LocationService/UpdateLocation"
-	LocationService_CalculateTravelDistance_FullMethodName = "/location.LocationService/CalculateTravelDistance"
+	LocationService_UpdateLocation_FullMethodName = "/location.LocationService/UpdateLocation"
 )
 
 // LocationServiceClient is the client API for LocationService service.
@@ -28,7 +27,6 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LocationServiceClient interface {
 	UpdateLocation(ctx context.Context, in *LocationRequest, opts ...grpc.CallOption) (*LocationResponse, error)
-	CalculateTravelDistance(ctx context.Context, in *TravelDistanceRequest, opts ...grpc.CallOption) (*TravelDistanceResponse, error)
 }
 
 type locationServiceClient struct {
@@ -49,22 +47,11 @@ func (c *locationServiceClient) UpdateLocation(ctx context.Context, in *Location
 	return out, nil
 }
 
-func (c *locationServiceClient) CalculateTravelDistance(ctx context.Context, in *TravelDistanceRequest, opts ...grpc.CallOption) (*TravelDistanceResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(TravelDistanceResponse)
-	err := c.cc.Invoke(ctx, LocationService_CalculateTravelDistance_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // LocationServiceServer is the server API for LocationService service.
 // All implementations must embed UnimplementedLocationServiceServer
 // for forward compatibility.
 type LocationServiceServer interface {
 	UpdateLocation(context.Context, *LocationRequest) (*LocationResponse, error)
-	CalculateTravelDistance(context.Context, *TravelDistanceRequest) (*TravelDistanceResponse, error)
 	mustEmbedUnimplementedLocationServiceServer()
 }
 
@@ -77,9 +64,6 @@ type UnimplementedLocationServiceServer struct{}
 
 func (UnimplementedLocationServiceServer) UpdateLocation(context.Context, *LocationRequest) (*LocationResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateLocation not implemented")
-}
-func (UnimplementedLocationServiceServer) CalculateTravelDistance(context.Context, *TravelDistanceRequest) (*TravelDistanceResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CalculateTravelDistance not implemented")
 }
 func (UnimplementedLocationServiceServer) mustEmbedUnimplementedLocationServiceServer() {}
 func (UnimplementedLocationServiceServer) testEmbeddedByValue()                         {}
@@ -120,24 +104,6 @@ func _LocationService_UpdateLocation_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
-func _LocationService_CalculateTravelDistance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(TravelDistanceRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(LocationServiceServer).CalculateTravelDistance(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: LocationService_CalculateTravelDistance_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(LocationServiceServer).CalculateTravelDistance(ctx, req.(*TravelDistanceRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // LocationService_ServiceDesc is the grpc.ServiceDesc for LocationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -148,10 +114,6 @@ var LocationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateLocation",
 			Handler:    _LocationService_UpdateLocation_Handler,
-		},
-		{
-			MethodName: "CalculateTravelDistance",
-			Handler:    _LocationService_CalculateTravelDistance_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -15,17 +15,8 @@ message LocationResponse {
     string status = 1;
 }
 
-message TravelDistanceRequest {
-    string username = 1;
-    string start = 2;
-    string end = 3;
-}
-
-message TravelDistanceResponse {
-    double distance = 1;
-}
-
 service LocationService {
     rpc UpdateLocation(LocationRequest) returns (LocationResponse);
-    rpc CalculateTravelDistance(TravelDistanceRequest) returns (TravelDistanceResponse);
+
+
 }

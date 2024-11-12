@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"math"
@@ -17,6 +18,7 @@ import (
 
 type server struct {
 	pb.UnimplementedLocationServiceServer
+	db *sql.DB
 }
 
 func (s *server) UpdateLocation(ctx context.Context, req *pb.LocationRequest) (*pb.LocationResponse, error) {
@@ -33,60 +35,6 @@ func (s *server) UpdateLocation(ctx context.Context, req *pb.LocationRequest) (*
 	}
 
 	return &pb.LocationResponse{Status: "Success"}, nil
-}
-func (s *server) CalculateTravelDistance(ctx context.Context, req *pb.TravelDistanceRequest) (*pb.TravelDistanceResponse, error) {
-	// Extract username, start, and end from the request
-	username := req.GetUsername()
-	startTime, err := time.Parse(time.RFC3339, req.GetStart())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse start time: %v", err)
-	}
-	endTime, err := time.Parse(time.RFC3339, req.GetEnd())
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse end time: %v", err)
-	}
-
-	// Query the database for locations within the given time range
-	rows, err := db.DB.Query(`
-		SELECT latitude, longitude, timestamp
-		FROM user_locations
-		WHERE username = $1 AND timestamp BETWEEN $2 AND $3
-		ORDER BY timestamp ASC`, username, startTime, endTime)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query database: %v", err)
-	}
-	defer rows.Close()
-
-	var totalDistance float64
-	var prevLat, prevLon float64
-	first := true
-
-	for rows.Next() {
-		var latitude, longitude float64
-		var timestamp time.Time
-		if err := rows.Scan(&latitude, &longitude, &timestamp); err != nil {
-			return nil, fmt.Errorf("failed to scan row: %v", err)
-		}
-
-		if !first {
-			// Calculate distance between the previous and current location
-			totalDistance += CalculateDistance(prevLat, prevLon, latitude, longitude)
-		} else {
-			first = false
-		}
-
-		prevLat = latitude
-		prevLon = longitude
-	}
-
-	// Return the travel distance response
-	return &pb.TravelDistanceResponse{
-		Username: username,
-		Distance: totalDistance,
-		Unit:     "kilometers",
-		Start:    req.GetStart(),
-		End:      req.GetEnd(),
-	}, nil
 }
 
 func CalculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
@@ -121,5 +69,7 @@ func main() {
 			log.Fatalf("Failed to serve: %v", err)
 		}
 	}()
+
+	select {}
 
 }
