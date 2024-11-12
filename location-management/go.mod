@@ -2,10 +2,12 @@ module location-management
 
 go 1.23.2
 
-require github.com/abotoiGrid/Golang-Project/proto v0.0.0-20241111121934-c642b5918fe2
+require (
+	github.com/abotoiGrid/Golang-Project/db v0.0.0-20241109105701-19ae03b5610e
+	github.com/abotoiGrid/Golang-Project/proto v0.0.0-20241111125600-c904381f7102
+)
 
 require (
-	github.com/abotoiGrid/Golang-Project v0.0.1 // indirect
 	github.com/bytedance/sonic v1.11.6 // indirect
 	github.com/bytedance/sonic/loader v0.1.1 // indirect
 	github.com/cloudwego/base64x v0.1.4 // indirect
@@ -37,6 +39,6 @@ require (
 	golang.org/x/sys v0.25.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1 // indirect
-	google.golang.org/grpc v1.68.0 // indirect
+	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.1 // indirect
 )

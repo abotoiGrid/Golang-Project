@@ -1,22 +1,92 @@
 package main
 
 import (
+	"context"
+	"fmt"
+	"log"
 	"math"
-	"net/http"
-	"regexp"
+	"net"
+	"strconv"
 	"time"
 
 	"github.com/abotoiGrid/Golang-Project/db"
-	"github.com/gin-gonic/gin"
+	pb "github.com/abotoiGrid/Golang-Project/proto"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
-func isValidUsername(username string) bool {
-	match, _ := regexp.MatchString(`^[a-zA-Z0-9]{4,16}$`, username)
-	return match
+type server struct {
+	pb.UnimplementedLocationServiceServer
 }
 
-func isValidCoordinate(coordinate float64) bool {
-	return coordinate >= -180 && coordinate <= 180
+func (s *server) UpdateLocation(ctx context.Context, req *pb.LocationRequest) (*pb.LocationResponse, error) {
+	timestamp, err := strconv.ParseInt(req.Timestamp, 10, 64)
+	if err != nil {
+		return &pb.LocationResponse{Status: "Failed"}, fmt.Errorf("failed to parse timestamp: %v", err)
+	}
+	timestampTime := time.Unix(timestamp, 0)
+
+	_, err = db.DB.Exec("INSERT INTO user_locations (username, latitude, longitude, timestamp) VALUES ($1, $2, $3, $4)",
+		req.Username, req.Latitude, req.Longitude, timestampTime)
+	if err != nil {
+		return &pb.LocationResponse{Status: "Failed"}, err
+	}
+
+	return &pb.LocationResponse{Status: "Success"}, nil
+}
+func (s *server) CalculateTravelDistance(ctx context.Context, req *pb.TravelDistanceRequest) (*pb.TravelDistanceResponse, error) {
+	// Extract username, start, and end from the request
+	username := req.GetUsername()
+	startTime, err := time.Parse(time.RFC3339, req.GetStart())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse start time: %v", err)
+	}
+	endTime, err := time.Parse(time.RFC3339, req.GetEnd())
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse end time: %v", err)
+	}
+
+	// Query the database for locations within the given time range
+	rows, err := db.DB.Query(`
+		SELECT latitude, longitude, timestamp
+		FROM user_locations
+		WHERE username = $1 AND timestamp BETWEEN $2 AND $3
+		ORDER BY timestamp ASC`, username, startTime, endTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query database: %v", err)
+	}
+	defer rows.Close()
+
+	var totalDistance float64
+	var prevLat, prevLon float64
+	first := true
+
+	for rows.Next() {
+		var latitude, longitude float64
+		var timestamp time.Time
+		if err := rows.Scan(&latitude, &longitude, &timestamp); err != nil {
+			return nil, fmt.Errorf("failed to scan row: %v", err)
+		}
+
+		if !first {
+			// Calculate distance between the previous and current location
+			totalDistance += CalculateDistance(prevLat, prevLon, latitude, longitude)
+		} else {
+			first = false
+		}
+
+		prevLat = latitude
+		prevLon = longitude
+	}
+
+	// Return the travel distance response
+	return &pb.TravelDistanceResponse{
+		Username: username,
+		Distance: totalDistance,
+		Unit:     "kilometers",
+		Start:    req.GetStart(),
+		End:      req.GetEnd(),
+	}, nil
 }
 
 func CalculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
@@ -34,83 +104,22 @@ func CalculateDistance(lat1, lon1, lat2, lon2 float64) float64 {
 	return R * c
 }
 
-func CalculateTravelDistance(c *gin.Context) {
-	var request struct {
-		Username string    `form:"username" binding:"required,alphanum,min=4,max=16"`
-		Start    time.Time `form:"start" time_format:"2006-01-02T15:04:05Z07:00"`
-		End      time.Time `form:"end" time_format:"2006-01-02T15:04:05Z07:00"`
-	}
-
-	if err := c.ShouldBindQuery(&request); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if !isValidUsername(request.Username) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid username. Must be 4-16 alphanumeric characters"})
-		return
-	}
-
-	// Default to last 24 hours if no time range specified
-	if request.Start.IsZero() {
-		request.End = time.Now()
-		request.Start = request.End.Add(-24 * time.Hour)
-	}
-
-	rows, err := db.DB.Query(`
-        SELECT latitude, longitude, timestamp
-        FROM user_locations
-        WHERE username = $1 AND timestamp BETWEEN $2 AND $3
-        ORDER BY timestamp ASC`,
-		request.Username, request.Start, request.End)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query database"})
-		return
-	}
-	defer rows.Close()
-
-	var totalDistance float64
-	var prevLat, prevLon float64
-	first := true
-
-	for rows.Next() {
-		var latitude, longitude float64
-		var timestamp time.Time
-		if err := rows.Scan(&latitude, &longitude, &timestamp); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to scan row"})
-			return
-		}
-
-		if !isValidCoordinate(latitude) || !isValidCoordinate(longitude) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid coordinates"})
-			return
-		}
-
-		if !first {
-			totalDistance += CalculateDistance(prevLat, prevLon, latitude, longitude)
-		} else {
-			first = false
-		}
-
-		prevLat = latitude
-		prevLon = longitude
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"username": request.Username,
-		"distance": totalDistance,
-		"unit":     "kilometers",
-		"start":    request.Start,
-		"end":      request.End,
-	})
-}
-
 func main() {
 	db.InitDB()
 	defer db.DB.Close()
 
-	router := gin.Default()
-	router.GET("/users/distance", CalculateTravelDistance)
-	router.Run(":9090")
+	go func() {
+		lis, err := net.Listen("tcp", ":50051")
+		if err != nil {
+			log.Fatalf("Failed to listen: %v", err)
+		}
+		s := grpc.NewServer()
+		pb.RegisterLocationServiceServer(s, &server{})
+		reflection.Register(s)
+		log.Println("LocationHistory gRPC server started on :50051")
+		if err := s.Serve(lis); err != nil {
+			log.Fatalf("Failed to serve: %v", err)
+		}
+	}()
+
 }
