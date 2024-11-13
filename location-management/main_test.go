@@ -5,9 +5,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/abotoiGrid/Golang-Project/db"
@@ -22,8 +24,14 @@ var testDB *sql.DB
 
 func setupTestDB() {
 	var err error
+	dbUser := os.Getenv("DB_USER")
+	dbPassword := os.Getenv("DB_PASSWORD")
+	dbName := os.Getenv("DB_NAME")
 
-	connStr := "user=postgres dbname=postgres sslmode=disable password=2160go"
+	if dbUser == "" || dbPassword == "" || dbName == "" {
+		log.Fatal("Database credentials are missing!")
+	}
+	connStr := fmt.Sprintf("user=%s password=%s dbname=%s sslmode=disable", dbUser, dbPassword, dbName)
 	testDB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatal("Failed to open database:", err)
